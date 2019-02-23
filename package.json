@@ -1,0 +1,14 @@
+{
+  "name": "just-another-package-manager",
+  "version": "1.0.0",
+  "description": "A simple package manager made just for fun xD",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Pranay Ankit Tiru",
+  "license": "MIT",
+  "dependencies": {
+    "fs-extra": "^7.0.1"
+  }
+}
