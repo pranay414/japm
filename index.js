@@ -1,6 +1,8 @@
-import fetch from 'node-fetch';
+import fetch  from 'node-fetch';
 import semver from 'semver';
-import fs from 'fs-extra';
+import fs     from 'fs-extra';
+
+import { readPackageJsonFromArchive } from './utilities';
 
 async function fetchPackage({ name, reference }) {
 
@@ -43,4 +45,16 @@ async function getPinnedReference({ name, reference }) {
     }
 
     return { name, reference };
+}
+
+async function getPackageDependencies({ name, reference }) {
+    let packageBuffer = await fetchPackage({ name, reference });
+    let packageJson = JSON.parse(await readPackageJsonFromArchive(packageBuffer));
+
+    // some packages have no dependencies field
+    let dependencies = packageJson.dependencies || {};
+
+    return Object.keys(dependencies).map(name => {
+        return { name, reference: dependencies[name] };
+    });
 }
