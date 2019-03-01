@@ -1,6 +1,9 @@
 const fetch = require('node-fetch');
 const semver = require('semver');
 const fs = require('fs-extra');
+const path = require('path');
+const cp = require('child_process');
+const util = require('util');
 
 const readPackageJsonFromArchive = require('./utilities').readPackageJsonFromArchive;
 
@@ -92,4 +95,58 @@ async function getPackageDependencyTree({ name, reference, dependencies }, avail
                 })
         ),
     };
+}
+
+// This function extracts an archive somewhere on the disk
+const extractNpmArchiveTo = require('./utilities').extractNpmArchiveTo;
+
+async function linkPackages({ name, reference, dependencies }, cwd) {
+    let dependencyTree = await getPackageDependencyTree({
+        name,
+        reference,
+        dependencies
+    });
+
+    if (reference) {
+        let packageBuffer = await fetchPackage({ name, reference });
+        await extractNpmArchiveTo(packageBuffer, cwd);
+    }
+
+    await Promise.all(
+        dependencies.map(async ({ name, reference, dependencies }) => {
+            let target = `${cwd}/node_modules/${name}`;
+            let binTarget = `${cwd}/node_modules/.bin`;
+
+            await linkPackages({ name, reference, dependencies }, target);
+
+            let dependencyPackageJson = require(`${target}/package.json`);
+            let bin = dependencyPackageJson.bin || {};
+
+            if (typeof bin === 'string') bin = { [name]: bin };
+
+            for (let binName of Object.keys(bin)) {
+                let source = resolve(target, bin[binName]);
+                let dest = `${binTarget}/${binName}`;
+
+                await fs.mkdirp(`${cwd}/node_modules/.bin`);
+                await fs.symlink(relative(binTarget, source), dest);
+            }
+
+            if(dependencyPackageJson.scripts) {
+                for(let scriptName of [`preinstall`,`install`,`postinstall`]) {
+                    let script = dependencyPackageJson.scripts[scriptName];
+
+                    if(!script)
+                        continue;
+
+                    await exec(script, {
+                        cwd: target,
+                        env: Object.assign({},process.env,{
+                            PATH: `${target}/node_modules/.bin:${process.env.PATH}`,
+                        }),
+                    });
+                }
+            }
+        })
+    );
 }
