@@ -132,16 +132,16 @@ async function linkPackages({ name, reference, dependencies }, cwd) {
                 await fs.symlink(relative(binTarget, source), dest);
             }
 
-            if(dependencyPackageJson.scripts) {
-                for(let scriptName of [`preinstall`,`install`,`postinstall`]) {
+            if (dependencyPackageJson.scripts) {
+                for (let scriptName of [`preinstall`, `install`, `postinstall`]) {
                     let script = dependencyPackageJson.scripts[scriptName];
 
-                    if(!script)
+                    if (!script)
                         continue;
 
                     await exec(script, {
                         cwd: target,
-                        env: Object.assign({},process.env,{
+                        env: Object.assign({}, process.env, {
                             PATH: `${target}/node_modules/.bin:${process.env.PATH}`,
                         }),
                     });
@@ -149,4 +149,33 @@ async function linkPackages({ name, reference, dependencies }, cwd) {
             }
         })
     );
+}
+
+function optimizePackageTree({ name, reference, dependencies }) {
+    dependencies = dependencies.map(dependency => {
+        return optimizePackageTree(dependency);
+    });
+
+    for (let hardDependency of dependencies.slice()) {
+        for (let subDependency of hardDependency.dependencies.slice()) {
+            let availableDependency = dependencies.find(dependency => {
+                return dependency.name === subDependency.name;
+            });
+
+            if (!availableDependency.length) dependencies.push(subDependency);
+
+            if (
+                !availableDependency ||
+                availableDependency.reference === subDependency.reference
+            ) {
+                hardDependency.dependencies.splice(
+                    hardDependency.dependencies.findIndex(dependency => {
+                        return dependency.name === subDependency.name;
+                    })
+                );
+            }
+        }
+    }
+
+    return { name, reference, dependencies };
 }
