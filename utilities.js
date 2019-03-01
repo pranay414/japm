@@ -1,7 +1,7 @@
-import gunzipMaybe from 'gunzip-maybe';
-import Progress    from 'progress';
-import tarFs       from 'tar-fs';
-import tar         from 'tar-stream';
+const gunzipMaybe = require('gunzip-maybe');
+const Progress = require('progress');
+const tarFs = require('tar-fs');
+const tar = require('tar-stream');
 
 function getFileName(entryName, virtualPath) {
 
@@ -22,7 +22,7 @@ function getFileName(entryName, virtualPath) {
 
 }
 
-export async function readFileFromArchive(fileName, buffer, {virtualPath = 0} = {}) {
+async function readFileFromArchive(fileName, buffer, { virtualPath = 0 } = {}) {
 
     return new Promise((resolve, reject) => {
 
@@ -79,13 +79,14 @@ export async function readFileFromArchive(fileName, buffer, {virtualPath = 0} = 
 
 }
 
-export async function readPackageJsonFromArchive(packageBuffer) {
+async function readPackageJsonFromArchive(packageBuffer) {
 
-    return await readFileFromArchive(`package.json`, packageBuffer, {virtualPath: 1});
+    return await readFileFromArchive(`package.json`, packageBuffer, { virtualPath: 1 });
 
 }
 
-export async function extractArchiveTo(packageBuffer, target, {virtualPath = 0} = {}) {
+
+async function extractArchiveTo(packageBuffer, target, { virtualPath = 0 } = {}) {
 
     return new Promise((resolve, reject) => {
 
@@ -114,15 +115,15 @@ export async function extractArchiveTo(packageBuffer, target, {virtualPath = 0} 
 
 }
 
-export async function extractNpmArchiveTo(packageBuffer, target) {
+async function extractNpmArchiveTo(packageBuffer, target) {
 
-    return await extractArchiveTo(packageBuffer, target, {virtualPath: 1});
+    return await extractArchiveTo(packageBuffer, target, { virtualPath: 1 });
 
 }
 
-export async function trackProgress(cb) {
+async function trackProgress(cb) {
 
-    let pace = new Progress(`:bar :current/:total (:elapseds)`, {width: 80, total: 1});
+    let pace = new Progress(`:bar :current/:total (:elapseds)`, { width: 80, total: 1 });
 
     try {
 
@@ -138,3 +139,5 @@ export async function trackProgress(cb) {
     }
 
 }
+
+module.exports = { readFileFromArchive, readPackageJsonFromArchive, extractArchiveTo, extractNpmArchiveTo, trackProgress }

@@ -1,8 +1,8 @@
-import fetch  from 'node-fetch';
-import semver from 'semver';
-import fs     from 'fs-extra';
+const fetch = require('node-fetch');
+const semver = require('semver');
+const fs = require('fs-extra');
 
-import { readPackageJsonFromArchive } from './utilities';
+const readPackageJsonFromArchive = require('./utilities').readPackageJsonFromArchive;
 
 async function fetchPackage({ name, reference }) {
 
@@ -57,4 +57,39 @@ async function getPackageDependencies({ name, reference }) {
     return Object.keys(dependencies).map(name => {
         return { name, reference: dependencies[name] };
     });
+}
+
+async function getPackageDependencyTree({ name, reference, dependencies }, available = new Map()) {
+    return {
+        name,
+        reference,
+        dependencies: await Promise.all(
+            dependencies.filter(volatileDependency => {
+                let availableReference = available.get(volatileDependency.name);
+
+                if (volatileDependency.reference === availableReference)
+                    return false;
+
+                if (
+                    semver.validRange(volatileDependency.reference) &&
+                    semver.satisfies(availableReference, volatileDependency.reference)
+                )
+                    return false;
+
+                return true;
+            })
+                .map(async volatileDependency => {
+                    let pinnedDependency = await getPinnedReference(volatileDependency);
+                    let subDependencies = await getPackageDependencies(pinnedDependency);
+
+                    let subAvailable = new Map(available);
+                    subAvailable.set(pinnedDependency.name, pinnedDependency.reference);
+
+                    return await getPackageDependencyTree(
+                        Object.assign({}, pinnedDependency, { dependencies: subDependencies }),
+                        subAvailable
+                    );
+                })
+        ),
+    };
 }
