@@ -100,6 +100,8 @@ async function getPackageDependencyTree({ name, reference, dependencies }, avail
 // This function extracts an archive somewhere on the disk
 const extractNpmArchiveTo = require('./utilities').extractNpmArchiveTo;
 
+const exec = util.promisify(cp.exec);
+
 async function linkPackages({ name, reference, dependencies }, cwd) {
     let dependencyTree = await getPackageDependencyTree({
         name,
@@ -125,11 +127,11 @@ async function linkPackages({ name, reference, dependencies }, cwd) {
             if (typeof bin === 'string') bin = { [name]: bin };
 
             for (let binName of Object.keys(bin)) {
-                let source = resolve(target, bin[binName]);
+                let source = path.resolve(target, bin[binName]);
                 let dest = `${binTarget}/${binName}`;
 
                 await fs.mkdirp(`${cwd}/node_modules/.bin`);
-                await fs.symlink(relative(binTarget, source), dest);
+                await fs.symlink(path.relative(binTarget, source), dest);
             }
 
             if (dependencyPackageJson.scripts) {
@@ -179,3 +181,26 @@ function optimizePackageTree({ name, reference, dependencies }) {
 
     return { name, reference, dependencies };
 }
+
+// Main function to install dependencies
+const trackProgress = require('./utilities').trackProgress;
+
+let cwd = path.resolve(process.argv[2] || process.cwd());
+let packageJson = require(path.resolve(cwd, `package.json`));
+
+let dest = path.resolve(process.argv[3] || cwd);
+
+packageJson.dependencies = Object.keys(packageJson.dependencies || {}).map(name => {
+    return { name, reference: packageJson.dependencies[name] };
+});
+
+Promise.resolve().then(() => {
+    console.log(`Resolving the package tree...`);
+    return trackProgress(pace => getPackageDependencyTree(pace, packageJson));
+}).then(packageTree => {
+    console.log(`Linking the packages on the filesystem...`);
+    return trackProgress(pace => linkPackages(pace, optimizePackageTree(packageTree), dest));
+}).catch(error => {
+    console.log(error.stack);
+    process.exit(1);
+});
